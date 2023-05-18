@@ -130,7 +130,7 @@ def solve_day_with_asp(day_name, services, packets, operators, priorities, reque
                 })
     return daily_scheduled_services
 
-def solve_day_with_milp(day_name, services, packets, operators, priorities, requests):
+def solve_day_with_milp(day_name, services, packets, operators, priorities, requests, method):
 
     # accumulators for each necessary index (no useless info)
     x_indexes = set()
@@ -196,7 +196,11 @@ def solve_day_with_milp(day_name, services, packets, operators, priorities, requ
     for index1 in range(len(chi_indexes) - 1):
         for index2 in range(index1 + 1, len(chi_indexes)):
             if chi_indexes[index1][2] == chi_indexes[index2][2]:
-                aux2_indexes.add((chi_indexes[index1][2], chi_indexes[index1][0], chi_indexes[index1][1], chi_indexes[index2][0], chi_indexes[index2][1]))
+                if method == "milp_basic" or method == "milp_epsilon":
+                    aux2_indexes.add((chi_indexes[index1][2], chi_indexes[index1][0], chi_indexes[index1][1], chi_indexes[index2][0], chi_indexes[index2][1]))
+                elif method == "milp_optimized":
+                    aux2_indexes.add((chi_indexes[index1][2], chi_indexes[index1][0], chi_indexes[index1][1], chi_indexes[index2][0], chi_indexes[index2][1], 0))
+                    aux2_indexes.add((chi_indexes[index1][2], chi_indexes[index1][0], chi_indexes[index1][1], chi_indexes[index2][0], chi_indexes[index2][1], 1))
 
     aux1_indexes = sorted(aux1_indexes)
     aux2_indexes = sorted(aux2_indexes)
@@ -219,6 +223,10 @@ def solve_day_with_milp(day_name, services, packets, operators, priorities, requ
     model.packet = Var(model.packet_indexes, domain=Boolean)
     model.aux1 = Var(model.aux1_indexes, domain=Boolean)
     model.aux2 = Var(model.aux2_indexes, domain=Boolean)
+
+    if method == "milp_epsilon":
+        model.epsilon1 = Var(model.aux2_indexes, domain=Boolean)
+        model.epsilon2 = Var(model.aux2_indexes, domain=Boolean)
 
     def f(model):
         return sum(model.packet[patient_name, packet_name] * priorities[patient_name] for patient_name, packet_name in model.packet_indexes)
@@ -266,19 +274,92 @@ def solve_day_with_milp(day_name, services, packets, operators, priorities, requ
             model.aux1[patient_name, service_name1, service_name2] * max_times[services[service_name2]["careUnit"]])
     model.patient_not_overlaps2 = Constraint(model.aux1_indexes, rule=f8)
 
-    def f9(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
-        service_duration = services[service_name1]["duration"]
-        _, care_unit_name = operator_name.split("__")
-        return (model.t[patient_name1, service_name1] + service_duration * model.chi[patient_name1, service_name1, operator_name] <= model.t[patient_name2, service_name2] +
-            (1 - model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2]) * max_times[care_unit_name])
-    model.operator_not_overlaps1 = Constraint(model.aux2_indexes, rule=f9)
+    if method == "milp_basic":
+        def f9(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            service_duration = services[service_name1]["duration"]
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name1, service_name1] + service_duration * model.chi[patient_name1, service_name1, operator_name] <= model.t[patient_name2, service_name2] +
+                (1 - model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2]) * max_times[care_unit_name])
+        model.operator_not_overlaps1 = Constraint(model.aux2_indexes, rule=f9)
 
-    def f10(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
-        service_duration = services[service_name2]["duration"]
-        _, care_unit_name = operator_name.split("__")
-        return (model.t[patient_name2, service_name2] + service_duration * model.chi[patient_name2, service_name2, operator_name] <= model.t[patient_name1, service_name1] +
-            model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2] * max_times[care_unit_name])
-    model.operator_not_overlaps2 = Constraint(model.aux2_indexes, rule=f10)
+        def f10(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            service_duration = services[service_name2]["duration"]
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name2, service_name2] + service_duration * model.chi[patient_name2, service_name2, operator_name] <= model.t[patient_name1, service_name1] +
+                model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2] * max_times[care_unit_name])
+        model.operator_not_overlaps2 = Constraint(model.aux2_indexes, rule=f10)
+    elif method == "milp_optimized":
+        def f9(model, operator_name, patient_name1, service_name1, patient_name2, service_name2, n):
+            if n != 0: return Constraint.Skip
+            service_duration = services[service_name1]["duration"]
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name1, service_name1] + service_duration * model.chi[patient_name1, service_name1, operator_name] <= model.t[patient_name2, service_name2] +
+                (1 - model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 0]) * max_times[care_unit_name])
+        model.operator_not_overlaps1 = Constraint(model.aux2_indexes, rule=f9)
+
+        def f10(model, operator_name, patient_name1, service_name1, patient_name2, service_name2, n):
+            if n != 1: return Constraint.Skip
+            service_duration = services[service_name2]["duration"]
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name2, service_name2] + service_duration * model.chi[patient_name2, service_name2, operator_name] <= model.t[patient_name1, service_name1] +
+                model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 1] * max_times[care_unit_name])
+        model.operator_not_overlaps2 = Constraint(model.aux2_indexes, rule=f10)
+
+        def f11(model, operator_name, patient_name1, service_name1, patient_name2, service_name2, n):
+            if n != 0: return Constraint.Skip
+            return (model.chi[patient_name1, service_name1, operator_name] + model.chi[patient_name2, service_name2, operator_name] - 1 <=
+                model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 0] + model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 1])
+        model.aux_constraints1 = Constraint(model.aux2_indexes, rule=f11)
+
+        def f12(model, operator_name, patient_name1, service_name1, patient_name2, service_name2, n):
+            if n == 1:
+                return (model.chi[patient_name1, service_name1, operator_name] >=
+                    model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 0] + model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 1])
+            return (model.chi[patient_name2, service_name2, operator_name] >=
+                model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 0] + model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2, 1])
+        model.aux_constraints2 = Constraint(model.aux2_indexes, rule=f12)
+    elif method == "milp_epsilon":
+        def f9(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            service_duration = services[service_name1]['duration']
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name1, service_name1] +
+                service_duration * (model.chi[patient_name1, service_name1, operator_name] - model.epsilon1[operator_name, patient_name1, service_name1, patient_name2, service_name2]) <=
+                model.t[patient_name2, service_name2] +
+                (1 - model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2]) * max_times[care_unit_name])
+        model.operator_not_overlaps1 = Constraint(model.aux2_indexes, rule=f9)
+
+        def f10(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            service_duration = services[service_name2]['duration']
+            _, care_unit_name = operator_name.split("__")
+            return (model.t[patient_name2, service_name2] +
+                service_duration * (model.chi[patient_name1, service_name1, operator_name] - model.epsilon2[operator_name, patient_name1, service_name1, patient_name2, service_name2]) <=
+                model.t[patient_name1, service_name1] +
+                model.aux2[operator_name, patient_name1, service_name1, patient_name2, service_name2] * max_times[care_unit_name])
+        model.operator_not_overlaps2 = Constraint(model.aux2_indexes, rule=f10)
+
+        def f11(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon1[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= model.chi[patient_name1, service_name1, operator_name]
+        model.ff1 = Constraint(model.aux2_indexes, rule=f11)
+
+        def f12(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon1[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= 1 - model.chi[patient_name2, service_name2, operator_name]
+        model.ff2 = Constraint(model.aux2_indexes, rule=f12)
+
+        def f13(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon1[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= model.x[patient_name2, service_name2]
+        model.ff3 = Constraint(model.aux2_indexes, rule=f13)
+
+        def f14(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon2[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= model.chi[patient_name2, service_name2, operator_name]
+        model.ff4 = Constraint(model.aux2_indexes, rule=f14)
+
+        def f15(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon2[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= 1 - model.chi[patient_name1, service_name1, operator_name]
+        model.ff5 = Constraint(model.aux2_indexes, rule=f15)
+
+        def f16(model, operator_name, patient_name1, service_name1, patient_name2, service_name2):
+            return model.epsilon2[operator_name, patient_name1, service_name1, patient_name2, service_name2] <= model.x[patient_name1, service_name1]
+        model.ff6 = Constraint(model.aux2_indexes, rule=f16)
 
     # if day_name == "day27":
     #     model.pprint()
@@ -307,13 +388,13 @@ def solve_subproblem(services, packets, operators, priorities, requests, method,
     results = dict()
     for day_name in requests.keys():
 
-        if verbose:
+        if verbose and method != "asp":
             print(f"{day_name}", end=", ")
 
         if method == "asp":
             daily_scheduled_services = solve_day_with_asp(day_name, services, packets, operators, priorities, requests)
-        elif method == "milp_basic":
-            daily_scheduled_services = solve_day_with_milp(day_name, services, packets, operators, priorities, requests)
+        else:
+            daily_scheduled_services = solve_day_with_milp(day_name, services, packets, operators, priorities, requests, method)
         
         # list all not satisfied packets
         not_scheduled_packets = dict()
