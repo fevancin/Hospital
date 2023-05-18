@@ -81,12 +81,12 @@ def generate_packets():
 def generate_operators():
     operators = {}
     for day_index in range(day_number):
-        operators[f"day{day_index:02}"] = {}
+        operators[f"{day_index}"] = {}
         for care_unit_index in range(care_unit_number):
-            operators[f"day{day_index:02}"][f"cu{care_unit_index:02}"] = {}
+            operators[f"{day_index}"][f"cu{care_unit_index:02}"] = {}
             size = random.randint(care_unit_size[0], care_unit_size[1])
             for operator_index in range(size):
-                operators[f"day{day_index:02}"][f"cu{care_unit_index:02}"][f"op{operator_index:02}"] = {
+                operators[f"{day_index}"][f"cu{care_unit_index:02}"][f"op{operator_index:02}"] = {
                     "start": random.randint(operator_start[0], operator_start[1]),
                     "duration": random.randint(operator_duration[0], operator_duration[1])
                 }
@@ -101,13 +101,13 @@ def generate_priorities():
 def generate_requests():
     requests = {}
     for day_index in range(day_number):
-        requests[f"day{day_index:02}"] = {}
+        requests[f"{day_index}"] = {}
         request_number = random.randint(request_amount[0], request_amount[1])
         patient_indexes = random.sample(range(patient_number), request_number)
         for patient_index in sorted(patient_indexes):
             size = random.randint(request_size[0], request_size[1])
             packets_indexes = random.sample(range(packet_number), size)
-            requests[f"day{day_index:02}"][f"pat{patient_index:02}"] = {
+            requests[f"{day_index}"][f"pat{patient_index:02}"] = {
                 "packets": sorted(map(lambda p: f"pkt{p:02}", packets_indexes))
             }
     return requests
