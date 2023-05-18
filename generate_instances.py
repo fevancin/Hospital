@@ -283,6 +283,12 @@ if __name__ == "__main__":
                 json.dump(full_input, f, indent=4)
             if os.path.isfile("requests.json"):
                 os.remove("requests.json")
+        if os.path.isfile("subsumptions.json"):
+            os.remove("subsumptions.json")
+        if os.path.isfile("results.json"):
+            os.remove("results.json")
+        if os.path.isfile("cores.json"):
+            os.remove("cores.json")
         if args.verbose:
             print(f"Created instance '{args.prefix}{instance_index:02}'")
         os.chdir("..")
