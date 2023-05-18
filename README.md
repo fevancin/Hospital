@@ -16,3 +16,7 @@ Solve all subproblems with `solve_subproblems.py`:
 - option `-m` specify the method used (`asp` or `milp`, default `asp`)
 - option `-i` specify the instances input directory (default `instances`)
 - option `-v` to see the output in verbose format
+
+COmpute all cores with `compute_cores.py`:
+- option `-i` specify the instances input directory (default `instances`)
+- option `-v` to see the output in verbose format
