@@ -2,11 +2,140 @@ import os
 import sys
 import json
 import argparse
+import subprocess
 from datetime import datetime
 
 from pyomo.environ import ConcreteModel, SolverFactory, maximize, TerminationCondition
 from pyomo.environ import Set, Var, Objective, Constraint
 from pyomo.environ import Boolean, value
+
+asp_program = """
+% patient_requests_protocol(Patient, Protocol, Iteration, Packet, StartDay, ExistenceStart, ExistenceEnd, Frequency, Tolerance).
+% patient_has_priority(Patient, Priority).
+% service(Service, CareUnit, Duration).
+% packet_has_service(Packet, Service).
+% care_unit_has_daily_capacity(CareUnit, Day, Capacity).
+% service_is_incompatible_with(Service1, Service2, DayWindow).
+% service_has_necessity_of(Service1, Service2, WindowStart, WindowEnd).
+% day(0..N).
+
+{ do(Patient, Packet, Day) } :-
+    patient_requests_protocol(Patient, _, _, Packet, StartDay, ExistenceStart, ExistenceEnd, Frequency, Tolerance),
+    day(Day), Day >= ExistenceStart, Day <= ExistenceEnd,
+    (Day - StartDay + Tolerance) \ Frequency <= (Tolerance * 2).
+
+protocol_window_done(Patient, Protocol, Iteration, 1..N, Packet) :-
+    patient_requests_protocol(Patient, Protocol, Iteration, Packet, StartDay, ExistenceStart, ExistenceEnd, Frequency, _),
+    N = (ExistenceEnd - StartDay + 1) / Frequency.
+
+% protocol_iteration_packet_done(Patient, Protocol, Iteration, Packet) :-
+%     patient_requests_protocol(Patient, Protocol, Iteration, Packet, StartDay, ExistenceStart, ExistenceEnd, Frequency, Tolerance),
+
+% :- care_unit_has_daily_capacity(CareUnit, Day, Capacity),
+%     #sum { Duration,Patient,Service :
+%         do(Patient, Packet, Day),
+%         packet_has_service(Packet, Service),
+%         service(Service, CareUnit, Duration) } > Capacity.
+
+% :- do(Patient, Packet1, Day1), do(Patient, Packet2, Day2),
+%     packet_has_service(Packet1, Service1), packet_has_service(Packet2, Service2),
+%     service_is_incompatible_with(Service1, Service2, DayWindow),
+%     Day2 - Day1 < DayWindow.
+
+% :- do(Patient, Packet1, Day1), not do(Patient, Packet2, Day2), day(Day2),
+%     packet_has_service(Packet1, Service1), packet_has_service(Packet2, Service2),
+%     service_has_necessity_of(Service1, Service2, WindowStart, WindowEnd),
+%     % Day2 >= Day1, maybe implied by the next two..
+%     Day2 - Day1 >= WindowStart, Day2 - Day1 <= WindowEnd.
+
+:~ do(Patient, Packet, Day), patient_has_priority(Patient, Priority). [-1@Priority,Patient,Packet,Day]
+
+#show do/3.
+"""
+
+def solve_master_with_asp(full_input):
+
+    patient_names = set()
+    service_names = set()
+    packet_names = set()
+    care_unit_names = set()
+
+    with open("input.lp", "w") as f:
+        for patient_name, patient in full_input['pat_request'].items():
+            patient_names.add(patient_name)
+            for protocol_name, protocol in patient.items():
+                if protocol_name == "priority_weight":
+                    continue
+                for iteration_name, iteration in protocol.items():
+                    initial_offset = iteration[1]
+                    for protocol_packet in iteration[0]:
+                        packet_name = protocol_packet['packet_id']
+                        packet_names.add(packet_name)
+                        for service_name in full_input['abstract_packet'][packet_name]:
+                            service_names.add(service_name)
+                            care_unit_names.add(full_input['services'][service_name]['careUnit'])
+                        f.write(f"patient_requests_protocol({patient_name}, {protocol_name}, {iteration_name}, {packet_name}, {protocol_packet['start_date'] + initial_offset}, {protocol_packet['existence'][0] + initial_offset}, {protocol_packet['existence'][1] + initial_offset}, {protocol_packet['freq']}, {protocol_packet['tolerance']}).\n")
+
+    patient_names = sorted(patient_names)
+    service_names = sorted(service_names)
+    packet_names = sorted(packet_names)
+    care_unit_names = sorted(care_unit_names)
+
+    with open("input.lp", "a") as f:
+        for patient_name in patient_names:
+            f.write(f"patient_has_priority({patient_name}, {full_input['pat_request'][patient_name]['priority_weight']}).\n")
+
+    with open("input.lp", "a") as f:
+        for service_name in service_names:
+            f.write(f"service({service_name}, {full_input['services'][service_name]['careUnit']}, {full_input['services'][service_name]['duration']}).\n")
+
+    with open("input.lp", "a") as f:
+        for packet_name in packet_names:
+            for service_name in full_input['abstract_packet'][packet_name]:
+                f.write(f"packet_has_service({packet_name}, {service_name}).\n")
+
+    with open("input.lp", "a") as f:
+        for day_name, day in full_input['capacity'].items():
+            for care_unit_name in care_unit_names:
+                f.write(f"care_unit_has_daily_capacity({care_unit_name}, {int(day_name)}, {day[care_unit_name]}).\n")
+
+    with open("input.lp", "a") as f:
+        for service_name in service_names:
+            for other_service_name, duration in full_input['interdiction'][service_name].items():
+                if duration == 0 or other_service_name not in service_names:
+                    continue
+                f.write(f"service_is_incompatible_with({service_name}, {other_service_name}, {duration}).\n")
+
+    with open("input.lp", "a") as f:
+        for service_name in service_names:
+            for other_service_name, window in full_input['necessity'][service_name].items():
+                f.write(f"service_has_necessity_of({service_name}, {other_service_name}, {window[0]}, {window[1]}).\n")
+
+    with open("input.lp", "a") as f:
+        f.write(f"day(0..{full_input['horizon'] - 1}).\n")
+    
+    with open("program.lp", "w") as f:
+        f.write(asp_program)
+
+    with open("output.txt", "w") as f:
+        subprocess.run(["clingo", "input.lp", "program.lp"], stdout=f, stderr=subprocess.DEVNULL)
+
+    requests = dict()
+    with open("output.txt", "r") as f:
+        rows = f.read().split("Answer")[-1].split("\n")[1].split("do(")[1:]
+        rows[-1] += " "
+        for row in rows:
+            tokens = row.split(",")
+            tokens[2] = tokens[2][:-2]
+            day_name = f"{int(tokens[2])}"
+            if day_name not in requests:
+                requests[day_name] = dict()
+            if tokens[0] not in requests[day_name]:
+                requests[day_name][tokens[0]] = {
+                    'packets': []
+                }
+            requests[day_name][tokens[0]]['packets'].append(tokens[1])
+    return requests
 
 def solve_master_with_milp(full_input):
     care_units_touched_by_packet = dict()
@@ -210,8 +339,10 @@ if __name__ == "__main__":
             full_input = json.load(f)
         if args.verbose:
             start_time = datetime.now()
-        # if args.method == "milp":
-        requests = solve_master_with_milp(full_input)
+        if args.method == "asp":
+            requests = solve_master_with_asp(full_input)
+        elif args.method == "milp":
+            requests = solve_master_with_milp(full_input)
         if args.verbose:
             end_time = datetime.now()
         with open("requests.json", "w") as f:
@@ -220,6 +351,12 @@ if __name__ == "__main__":
             delta = (end_time - start_time).total_seconds()
             print(f"finished! Time taken: {delta}s")
             total_time += delta
+        if os.path.isfile("input.lp"):
+            os.remove("input.lp")
+        if os.path.isfile("program.lp"):
+            os.remove("program.lp")
+        if os.path.isfile("output.txt"):
+            os.remove("output.txt")
         os.chdir("..")
 
     if args.verbose:
