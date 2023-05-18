@@ -27,3 +27,10 @@ Solve all subproblems with `solve_subproblems.py`:
 Compute all unsatisfiable cores with `compute_cores.py`:
 - option `-i` specify the instances input directory (default `instances`)
 - option `-v` to see the output in verbose format
+
+---
+
+Solve all master problems with `solve_master.py`:
+- option `-m` specify the method used (`asp`or `milp`, default `asp`)
+- option `-i` specify the instances input directory (default `instances`)
+- option `-v` to see the output in verbose format
