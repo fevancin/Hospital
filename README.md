@@ -11,3 +11,8 @@ Compute the subsumptions on the days with `compute_subsumptions.py`:
 - option `-m` specify the method used (`asp` or `milp`, default `asp`)
 - option `-i` specify the instances input directory (default `instances`)
 - option `-v` to see the output in verbose format
+
+Solve all subproblems with `solve_subproblems.py`:
+- option `-m` specify the method used (`asp` or `milp`, default `asp`)
+- option `-i` specify the instances input directory (default `instances`)
+- option `-v` to see the output in verbose format
