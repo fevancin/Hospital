@@ -364,7 +364,7 @@ def solve_day_with_milp(day_name, services, packets, operators, priorities, requ
     # if day_name == "day27":
     #     model.pprint()
 
-    opt = SolverFactory("glpk")
+    opt = SolverFactory("gurobi")
     result = opt.solve(model)
 
     # decoding solver answer
@@ -455,7 +455,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action="store_true", help="show what is done")
     args = parser.parse_args(sys.argv[1:])
 
-    os.chdir(os.path.dirname(sys.argv[0]))
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
     if not os.path.isdir(args.input):
         raise FileNotFoundError(f"Input folder '{args.input}' not found")

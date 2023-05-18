@@ -90,7 +90,7 @@ def is_milp_program_satisfiable(more_operators, less_operators):
     def f2(model, less_operator_index1, less_operator_index2, more_operator_index):
         return model.x[less_operator_index1, more_operator_index] + model.x[less_operator_index2, more_operator_index] <= 1
     model.not_overlap = Constraint(model.not_overlap_indexes, rule=f2)
-    opt = SolverFactory("glpk")
+    opt = SolverFactory("gurobi")
     results = opt.solve(model)
     if results.solver.termination_condition == TerminationCondition.infeasible:
         return False
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action="store_true", help="show what is done")
     args = parser.parse_args(sys.argv[1:])
 
-    os.chdir(os.path.dirname(sys.argv[0]))
+    os.chdir(os.path.dirname(os.path.abspath(sys.argv[0])))
 
     if not os.path.isdir(args.input):
         raise FileNotFoundError(f"Input folder '{args.input}' not found")
