@@ -61,7 +61,7 @@ def is_milp_program_satisfiable(more_operators, less_operators):
     x_indexes = []
     for more_operator_name, more_operator in more_operators.items():
         for less_operator_name, less_operator in less_operators.items():
-            if more_operator['start'] <= less_operator['start'] and more_operator['start'] + more_operator['duration'] >= less_operator['start'] + less_operator['duration']:
+            if more_operator["start"] <= less_operator["start"] and more_operator["start"] + more_operator["duration"] >= less_operator["start"] + less_operator["duration"]:
                 x_indexes.append((less_operator_name, more_operator_name))
     less_indexes = []
     for less_operator_name in less_operators.keys():
@@ -71,10 +71,10 @@ def is_milp_program_satisfiable(more_operators, less_operators):
         for index2 in range(index1 + 1, len(x_indexes)):
             if x_indexes[index1][1] != x_indexes[index2][1] or x_indexes[index1][0] == x_indexes[index2][0]:
                 continue
-            if ((less_operators[x_indexes[index1][0]]['start'] <= less_operators[x_indexes[index2][0]]['start'] and
-                less_operators[x_indexes[index1][0]]['start'] + less_operators[x_indexes[index1][0]]['duration'] > less_operators[x_indexes[index2][0]]['start']) or
-                (less_operators[x_indexes[index2][0]]['start'] <= less_operators[x_indexes[index1][0]]['start'] and
-                 less_operators[x_indexes[index2][0]]['start'] + less_operators[x_indexes[index2][0]]['duration'] > less_operators[x_indexes[index1][0]]['start'])):
+            if ((less_operators[x_indexes[index1][0]]["start"] <= less_operators[x_indexes[index2][0]]["start"] and
+                less_operators[x_indexes[index1][0]]["start"] + less_operators[x_indexes[index1][0]]["duration"] > less_operators[x_indexes[index2][0]]["start"]) or
+                (less_operators[x_indexes[index2][0]]["start"] <= less_operators[x_indexes[index1][0]]["start"] and
+                 less_operators[x_indexes[index2][0]]["start"] + less_operators[x_indexes[index2][0]]["duration"] > less_operators[x_indexes[index1][0]]["start"])):
                 overlap_indexes.append((x_indexes[index1][0], x_indexes[index2][0], x_indexes[index1][1]))
     model = ConcreteModel()
     model.x_indexes = Set(initialize=x_indexes)
@@ -90,7 +90,7 @@ def is_milp_program_satisfiable(more_operators, less_operators):
     def f2(model, less_operator_index1, less_operator_index2, more_operator_index):
         return model.x[less_operator_index1, more_operator_index] + model.x[less_operator_index2, more_operator_index] <= 1
     model.not_overlap = Constraint(model.not_overlap_indexes, rule=f2)
-    opt = SolverFactory('glpk')
+    opt = SolverFactory("glpk")
     results = opt.solve(model)
     if results.solver.termination_condition == TerminationCondition.infeasible:
         return False
@@ -106,7 +106,7 @@ def compute_subsumptions(operators, method):
             less_day_names = set()
             more_total_duration = 0
             for more_operator in more_day[care_unit_name].values(): # write the input program
-                more_total_duration += more_operator['duration'] # sum the operators' duration
+                more_total_duration += more_operator["duration"] # sum the operators" duration
             for less_day_name, less_day in operators.items(): # for each less day
                 if more_day_name == less_day_name: # symmetric check
                     continue
@@ -117,10 +117,10 @@ def compute_subsumptions(operators, method):
                 less_total_duration = 0
                 all_less_operators_are_satisfiable = True
                 for less_operator in less_day[care_unit_name].values(): # write che input program
-                    less_total_duration += less_operator['duration'] # sum the operators' duration
+                    less_total_duration += less_operator["duration"] # sum the operators" duration
                     is_operator_satisfiable = False
                     for more_operator in more_day[care_unit_name].values(): # search at least one more operator that contains the less one
-                        if more_operator['start'] <= less_operator['start'] and more_operator['start'] + more_operator['duration'] >= less_operator['start'] + less_operator['duration']:
+                        if more_operator["start"] <= less_operator["start"] and more_operator["start"] + more_operator["duration"] >= less_operator["start"] + less_operator["duration"]:
                             is_operator_satisfiable = True
                             break
                     if not is_operator_satisfiable:
@@ -138,10 +138,10 @@ def compute_subsumptions(operators, method):
                 there_is_overlap = False
                 for index1 in range(len(less_operator_list) - 1):
                     for index2 in range(index1 + 1, len(less_operator_list)):
-                        if less_operator_list[index1]['start'] <= less_operator_list[index2]['start'] and less_operator_list[index1]['start'] + less_operator_list[index1]['duration'] > less_operator_list[index2]['start'] + less_operator_list[index2]['duration']:
+                        if less_operator_list[index1]["start"] <= less_operator_list[index2]["start"] and less_operator_list[index1]["start"] + less_operator_list[index1]["duration"] > less_operator_list[index2]["start"] + less_operator_list[index2]["duration"]:
                             there_is_overlap = True
                             break
-                        if less_operator_list[index2]['start'] <= less_operator_list[index1]['start'] and less_operator_list[index2]['start'] + less_operator_list[index2]['duration'] > less_operator_list[index1]['start'] + less_operator_list[index1]['duration']:
+                        if less_operator_list[index2]["start"] <= less_operator_list[index1]["start"] and less_operator_list[index2]["start"] + less_operator_list[index2]["duration"] > less_operator_list[index1]["start"] + less_operator_list[index1]["duration"]:
                             there_is_overlap = True
                             break
                     if there_is_overlap:
