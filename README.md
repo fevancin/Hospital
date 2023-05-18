@@ -13,10 +13,10 @@ Compute the subsumptions on the days with `compute_subsumptions.py`:
 - option `-v` to see the output in verbose format
 
 Solve all subproblems with `solve_subproblems.py`:
-- option `-m` specify the method used (`asp` or `milp`, default `asp`)
+- option `-m` specify the method used (`asp`, `milp_basic`, `milp_optimized` or `milp_epsilon`, default `asp`)
 - option `-i` specify the instances input directory (default `instances`)
 - option `-v` to see the output in verbose format
 
-COmpute all cores with `compute_cores.py`:
+Compute all cores with `compute_cores.py`:
 - option `-i` specify the instances input directory (default `instances`)
 - option `-v` to see the output in verbose format
