@@ -39,9 +39,15 @@ def get_care_unit_names(operators):
     return sorted(care_unit_names)
 
 # true if it exists a match
-def is_asp_program_satisfiable(input_program):
+def is_asp_program_satisfiable(more_operators, less_operators):
+    more_program = ""
+    for more_operator_name, more_operator in more_operators.items(): # write the input program
+        more_program += f"more({more_operator_name}, {more_operator['start']}, {more_operator['duration']}).\n"
+    less_program = ""
+    for less_operator_name, less_operator in less_operators.items(): # write the input program
+        less_program += f"less({less_operator_name}, {less_operator['start']}, {less_operator['duration']}).\n"
     with open("input.lp", "w") as f:
-        f.write(input_program)
+        f.write(more_program + less_program)
     with open("program.lp", "w") as f:
         f.write(asp_program)
     with open("output.txt", "w") as f:
@@ -50,76 +56,6 @@ def is_asp_program_satisfiable(input_program):
         if "UNSATISFIABLE" not in f.read():
             return True
     return False
-
-def compute_subsumptions_with_asp(operators):
-    subsumptions = dict()
-    for care_unit_name in get_care_unit_names(operators): # for each care unit
-        care_unit_subsumptions = dict()
-        for more_day_name, more_day in operators.items(): # for each more day
-            if len(more_day) == 0:
-                continue
-            less_day_names = set()
-            more_total_duration = 0
-            more_program = ""
-            for more_operator_name, more_operator in more_day[care_unit_name].items(): # write the input program
-                more_program += f"more({more_operator_name}, {more_operator['start']}, {more_operator['duration']}).\n"
-                more_total_duration += more_operator['duration'] # sum the operators' duration
-            for less_day_name, less_day in operators.items(): # for each less day
-                if more_day_name == less_day_name: # symmetric check
-                    continue
-                if len(less_day) == 0:
-                    continue
-                if less_day_name in less_day_names: # if already in the less list
-                    continue
-                less_total_duration = 0
-                input_program = more_program
-                all_less_operators_are_satisfiable = True
-                for less_operator_name, less_operator in less_day[care_unit_name].items(): # write che input program
-                    input_program += f"less({less_operator_name}, {less_operator['start']}, {less_operator['duration']}).\n"
-                    less_total_duration += less_operator['duration'] # sum the operators' duration
-                    is_operator_satisfiable = False
-                    for more_operator in more_day[care_unit_name].values(): # search at least one more operator that contains the less one
-                        if more_operator['start'] <= less_operator['start'] and more_operator['start'] + more_operator['duration'] >= less_operator['start'] + less_operator['duration']:
-                            is_operator_satisfiable = True
-                            break
-                    if not is_operator_satisfiable:
-                        all_less_operators_are_satisfiable = False
-                        break
-                if less_total_duration > more_total_duration: # check for impossibility regarding the total durations
-                    continue
-                if not all_less_operators_are_satisfiable: # check for impossibility regarding operators satisfiability
-                    continue
-                if len(less_day[care_unit_name]) == 1:
-                    less_day_names.add(less_day_name) # add the subsumption if a match exists
-                    if less_day_name in care_unit_subsumptions: # relation transitivity check
-                        less_day_names.update(care_unit_subsumptions[less_day_name])
-                less_operator_list = list(less_day[care_unit_name].values())
-                there_is_overlap = False
-                for index1 in range(len(less_operator_list) - 1):
-                    for index2 in range(index1 + 1, len(less_operator_list)):
-                        if less_operator_list[index1]['start'] <= less_operator_list[index2]['start'] and less_operator_list[index1]['start'] + less_operator_list[index1]['duration'] > less_operator_list[index2]['start'] + less_operator_list[index2]['duration']:
-                            there_is_overlap = True
-                            break
-                        if less_operator_list[index2]['start'] <= less_operator_list[index1]['start'] and less_operator_list[index2]['start'] + less_operator_list[index2]['duration'] > less_operator_list[index1]['start'] + less_operator_list[index1]['duration']:
-                            there_is_overlap = True
-                            break
-                    if there_is_overlap:
-                        break
-                if not there_is_overlap or is_asp_program_satisfiable(input_program):
-                    less_day_names.add(less_day_name) # add the subsumption if a match exists
-                    if less_day_name in care_unit_subsumptions: # relation transitivity check
-                        less_day_names.update(care_unit_subsumptions[less_day_name])
-            if len(less_day_names) > 0:
-                care_unit_subsumptions[more_day_name] = sorted(less_day_names)
-        subsumptions[care_unit_name] = care_unit_subsumptions
-    # removing of temporary working files
-    if os.path.isfile("input.lp"):
-        os.remove("input.lp")
-    if os.path.isfile("program.lp"):
-        os.remove("program.lp")
-    if os.path.isfile("output.txt"):
-        os.remove("output.txt")
-    return subsumptions
 
 def is_milp_program_satisfiable(more_operators, less_operators):
     x_indexes = []
@@ -160,7 +96,7 @@ def is_milp_program_satisfiable(more_operators, less_operators):
         return False
     return True
 
-def compute_subsumptions_with_milp(operators):
+def compute_subsumptions(operators, method):
     subsumptions = dict()
     for care_unit_name in get_care_unit_names(operators): # for each care unit
         care_unit_subsumptions = dict()
@@ -210,13 +146,26 @@ def compute_subsumptions_with_milp(operators):
                             break
                     if there_is_overlap:
                         break
-                if not there_is_overlap or is_milp_program_satisfiable(more_day[care_unit_name], less_day[care_unit_name]):
-                    less_day_names.add(less_day_name) # add the subsumption if a match exists
-                    if less_day_name in care_unit_subsumptions: # relation transitivity check
-                        less_day_names.update(care_unit_subsumptions[less_day_name])
+                if method == "asp":
+                    if not there_is_overlap or is_asp_program_satisfiable(more_day[care_unit_name], less_day[care_unit_name]):
+                        less_day_names.add(less_day_name) # add the subsumption if a match exists
+                        if less_day_name in care_unit_subsumptions: # relation transitivity check
+                            less_day_names.update(care_unit_subsumptions[less_day_name])
+                elif method == "milp":
+                    if not there_is_overlap or is_milp_program_satisfiable(more_day[care_unit_name], less_day[care_unit_name]):
+                        less_day_names.add(less_day_name) # add the subsumption if a match exists
+                        if less_day_name in care_unit_subsumptions: # relation transitivity check
+                            less_day_names.update(care_unit_subsumptions[less_day_name])
             if len(less_day_names) > 0:
                 care_unit_subsumptions[more_day_name] = sorted(less_day_names)
         subsumptions[care_unit_name] = care_unit_subsumptions
+    # removing of temporary working files
+    if os.path.isfile("input.lp"):
+        os.remove("input.lp")
+    if os.path.isfile("program.lp"):
+        os.remove("program.lp")
+    if os.path.isfile("output.txt"):
+        os.remove("output.txt")
     return subsumptions
 
 if __name__ == "__main__":
@@ -249,16 +198,13 @@ if __name__ == "__main__":
             operators = json.load(f)
         if args.verbose:
             start_time = datetime.now()
-        if args.method == "asp":
-            subsumptions = compute_subsumptions_with_asp(operators)
-        elif args.method == "milp":
-            subsumptions = compute_subsumptions_with_milp(operators)
+        subsumptions = compute_subsumptions(operators, args.method)
         if args.verbose:
             end_time = datetime.now()
         with open("subsumptions.json", "w") as f:
             json.dump(subsumptions, f, indent=4)
         if args.verbose:
-            delta = (end_time - start_time).microseconds / 1000000
+            delta = (end_time - start_time).total_seconds()
             print(f"finished! Time taken: {delta}s")
             total_time += delta
         os.chdir("..")
