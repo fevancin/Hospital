@@ -85,7 +85,7 @@ def generate_requests():
         requests[f"day{day_index:02}"] = {}
         request_number = random.randint(request_amount[0], request_amount[1])
         patient_indexes = random.sample(range(patient_number), request_number)
-        for patient_index in patient_indexes:
+        for patient_index in sorted(patient_indexes):
             size = random.randint(request_size[0], request_size[1])
             packets_indexes = random.sample(range(packet_number), size)
             requests[f"day{day_index:02}"][f"pat{patient_index:02}"] = {
