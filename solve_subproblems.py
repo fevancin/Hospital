@@ -110,7 +110,7 @@ def solve_day_with_asp(day_name, services, packets, operators, priorities, reque
 
     # solve subproblem problem
     with open("output.txt", "w") as f:
-        subprocess.run(["clingo", "input.lp", "program.lp", "--time-limit=1"], stdout=f, stderr=subprocess.DEVNULL)
+        subprocess.run(["clingo", "input.lp", "program.lp"], stdout=f, stderr=subprocess.DEVNULL)
 
     # decoding solver answer
     daily_scheduled_services = []
