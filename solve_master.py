@@ -331,7 +331,7 @@ if __name__ == "__main__":
     if args.verbose:
         total_time = 0
 
-    for folder_name in os.listdir("."):
+    for folder_name in sorted(os.listdir(".")):
         os.chdir(folder_name)
         if args.verbose:
             print(f"Read instance '{folder_name}' ... ", end=" ")
