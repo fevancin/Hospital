@@ -289,6 +289,8 @@ if __name__ == "__main__":
             os.remove("results.json")
         if os.path.isfile("cores.json"):
             os.remove("cores.json")
+        if os.path.isfile("prev_cores.json"):
+            os.remove("prev_cores.json")
         if args.verbose:
             print(f"Created instance '{args.prefix}{instance_index:02}'")
         os.chdir("..")
