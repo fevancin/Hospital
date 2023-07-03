@@ -12,27 +12,27 @@ from datetime import datetime
 day_number = 30
 care_unit_number = 4
 
-service_number = 50
-service_duration = (1, 10)
+service_number = 10
+service_duration = (10, 10)
 service_cost = (1, 10)
 
-packet_number = 50
-packet_size = (1, 3)
+packet_number = 10
+packet_size = (1, 4)
 
 operator_start = (1, 50)
-operator_duration = (10, 50)
-care_unit_size = (1, 4)         # how many operators can be inside one care unit
+operator_duration = (10, 20)
+care_unit_size = (1, 1)         # how many operators can be inside one care unit
 
-patient_number = 20
-patient_priority = (1, 4)
+patient_number = 30
+patient_priority = (1, 1)
 
 request_amount = (1, 4)         # patient number in the same day
 request_size = (1, 2)           # numer of packets requested by a single patient
 
-interdiction_probability = 0.25
+interdiction_probability = 0.0
 interdiction_duration = (1, 2)
 
-necessity_probability = 0.25
+necessity_probability = 0.0
 necessity_size = (1, 2)
 necessity_start = (1, 3)
 necessity_duration = (1, 7)
